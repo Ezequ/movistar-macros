@@ -1,0 +1,6 @@
+VERSION BUILD=8970419 RECORDER=FX
+TAB T=1
+URL GOTO=http://websoluciones/solution_framework/visor
+TAG POS=1 TYPE=SELECT ATTR=ID:cmb-tipo-numero CONTENT=%numero_documento
+TAG POS=1 TYPE=INPUT:TEXT ATTR=ID:txt-numero CONTENT={{RUC}}
+TAG POS=1 TYPE=BUTTON ATTR=ID:btn-consultar
