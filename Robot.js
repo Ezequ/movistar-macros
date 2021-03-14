@@ -39,18 +39,20 @@ function runRobot(needLogin) {
 						window.alert('No pending tasks');
 						
 					} else {
-						window.alert("RUC: "+taskInformation.ruc);
+						//window.alert("RUC: "+taskInformation.ruc);
 					}
 					errorServerRetry = 3;
 					ruc = taskInformation.ruc;
 					taskId = taskInformation.id;
 				}
-				iimSet("RUC", ruc)
+				iimSet("RUC", ruc);
 			  	var screenIsLoaded = iimPlay("Movistar\\2_Busqueda");
-			  	window.alert(screenIsLoaded);
+			  	//window.alert(screenIsLoaded);
 				// Validacion de datos necesarios para buscar lineas activas
-				if (screenIsLoaded !=  '-802' && screenIsLoaded !=  '-1450' && screenIsLoaded !=  '-971'){
-					var error = checkIfLinesExists();
+				if (screenIsLoaded == '1'){
+					var anchors = window.content.document.querySelectorAll('[data-tipo_numero="cms"]');
+					walkThrowTable();
+					window.alert("TERMINO");
 					//window.alert('cargo bien');	
 				} else if (screenIsLoaded ==  '-802') {
 					var error = 2;
@@ -78,37 +80,7 @@ function runRobot(needLogin) {
 					}
 					window.alert('asd');
 				} else {
-					var checked = selectClientsCheckboxes();
-					if (checked == -1) {
-						needNextRuc = false;
-						break;
-					} else if (checked == 0) {
-						sendInformation(taskId, 'NO-INFO', ruc);
-						needNextRuc = true;
-						//goBackToSisacLogin();
-						cancelButtonOfLines();
-						continue;
-					}
-					// iimPlay("Claro\\4_Busqueda-Lineas-Activas");					
-					var table = getTableToSend();
-					if (table == false) {
-						needNextRuc = false;
-						goBackToSisacLogin();
-						break;
-					}
-					if (table === "ERROR-SERVIDOR") {
-						errorServerRetry--;
-						if (errorServerRetry <= 0) {
-							// Fallo muchas veces, mando mail avisando y se guarda como error
-							requestApi('POST',false,{'msg':'El servidor de claro esta funcionando mal ruc:'+ruc, 'robot':'claro'},'pending_task/send_email');
-							errorServerRetry = 3;
-						} else {
-							// Falla servidor entonces reintento
-							needNextRuc = false;
-							goBackToSisacLogin();
-							continue;
-						}
-					}
+					
 					// Si funciono correctamente , leo el proximo
 					needNextRuc = sendInformation(taskId, table, ruc);
 					processed++;
@@ -120,10 +92,6 @@ function runRobot(needLogin) {
 		}
 	}
 	return processed;
-}
-
-function cancelButtonOfLines(){
-	iimPlayCode('TAG POS=1 TYPE=INPUT:BUTTON FORM=ID:frmPrincipal ATTR=ID:cmdCancelar');
 }
 
 function getCredentials(){
@@ -141,7 +109,6 @@ function checkIfUserIsLogOut(loginTry)
 	}
 	if (window.content.document.body.innerHTML.includes('Acepto los terminos y condiciones.')){
 		//requestApi('POST',false,{'msg':'Fallo el login a Claro', 'subject':'Revisar el usuario y contrasena', 'robot':'claro'},'pending_task/send_email');
-		window.alert('Deslogueado');
 		return true;
 	} else if (window.content.document.body.innerHTML.includes('La evaluación de la política')) {
 		//window.alert('ERROR:Evaluacion politica de usuario intentos:'+loginTry);
@@ -153,11 +120,6 @@ function checkIfUserIsLogOut(loginTry)
 	return href == "https://portalvpnssl.claro.com.pe/vdesk/hangup.php3" || href == "https://portalvpnssl.claro.com.pe/my.logout.php3?errorcode=20" || href== "about:blank";
 }
 
-function goBackToSisacLogin() {
-	//var found = iimPlayCode('TAG POS=1 TYPE=INPUT:BUTTON FORM=ID:frmPrincipal ATTR=ID:cmdCancelar');	
-	iimPlay("Claro\\2_Sisact-Login");
-	return ;
-}
 
 function sendInformation(id, lines, ruc)
 {
@@ -185,11 +147,6 @@ function requestApi(method, async, data, uri) {
 }
 
 
-function prueba() {
-	var table = window.content.document.getElementsByName('main')[0].contentDocument.getElementsByName('iframeBody')[0].contentDocument.body.innerHTML;
-	//requestApi('20101014097',table);
-}
-
 function getNextRuc(onlyCheck) {
 	if (onlyCheck) {
 		var onlyCheck = '?only_check='+onlyCheck;
@@ -209,7 +166,7 @@ function getNextRuc(onlyCheck) {
 
 function checkIfCanInit() {
 	return true;
-	var information = requestApi('GET', false, {}, 'pending_task/init/claro');
+	var information = requestApi('GET', false, {}, 'pending_task/init/movistar');
 	if (information) {
 		var taskInformation = JSON.parse(information.response);
 		iimDisplay('RUC procesandose:'+taskInformation.ruc);
@@ -229,59 +186,40 @@ function searchMenuExists() {
 	return exists;
 }
 
-
-function checkIfLinesExists() {
-	// Verificacion de resultado de busqueda
-	if (window.content.document.body.innerHTML.includes('(403) Forbidden.')) {
-		return 1;
-	}
-	if (window.content.document.body.innerHTML.includes('Length cannot be less than zero')){
-		return 2;
-	}
-	return 0;
-}
-
-function getTableToSend() {
-	var table = "";
-	try {
-		table = window.content.document.getElementsByName('main')[0].contentDocument.getElementsByName('iframeBody')[0].contentDocument.body.innerHTML;
-		if (table.includes('The remote server returned an error')) {
-
-			return "ERROR-SERVIDOR";
-			window.alert('El servidor de claro esta funcionando mal.');
+function walkThrowTable() {
+	//var anchors = getAllElementsWithAttribute('[data-tipo_numero="cms"]');
+	var anchors = window.content.document.getElementsByClassName("btn-telefono-mt");
+	for (var i = 0; i < anchors.length; i++) {
+		window.alert("ANCHOR:"+i);
+		var element = anchors[i];
+		element.click();
+		if (window.content.document.body.innerHTML.includes('No se encontraron registros')){
+			continue;
 		}
-	} catch (error) {
-		iimDisplay("Error obteniendo la table:"+error);
-		table = false;
-	}
-	return table;
-}
+		var list = window.content.document.getElementById("collapseAfiliacion");
+		var trs = list.getElementsByTagName("tr");
+		for (var j = 0; j < trs.length; j++) {
+			if (j == 0) continue; // header
+			var tr = trs[j];
+			//window.alert(tds[0]);
+			var tds = tr.getElementsByTagName("td");
+			if (tds.length && tds[0] != "undefined") {
+				var lineNumber = tds[2].innerText;
+				var clientCode = tds[3].innerText;
+				var account = tds[4].innerText;
+				if (shouldGetReceipe(lineNumber, clientCode, account)) {
 
-function selectClientsCheckboxes() {
-	try {
-		var rows = window.content.document.getElementById("DataGrid1").rows;
-		var checked = 0;
-		for (var i = 1; i < rows.length; i++) {
-			var currentRow = rows[i];
-			var currentTds = currentRow .childNodes;
-			var activeLines = parseInt(currentTds[11].textContent);
-			var inActiveLines = parseInt(currentTds[12].textContent);
-			if (activeLines + inActiveLines > 0) {
-				checked++;
-				iimPlayCode("TAG POS="+i+" TYPE=INPUT:CHECKBOX FORM=ID:frmPrincipal ATTR=ID:optSel CONTENT=YES");
-				if (checked > 3){
-					break;
 				}
+				window.alert("TD VALUE:"+lineNumber+ "TD VALUE:"+clientCode+"TD VALUE:"+account);
 			}
 		}
-		iimPlayCode("TAG POS=1 TYPE=INPUT:BUTTON FORM=ID:frmPrincipal ATTR=ID:cmdSeleccionar");
-		iimPlayCode("WAIT SECONDS=5");
-	} catch (error) {
-		iimDisplay("Error chequeando los clientes:"+error);
-		checked = -1;
-	}	
-	return checked;
+	}
 }
+
+function shouldGetReceipe(lineNumber, clientCode, account){
+	return true;
+}
+
 
 var processed = 0;
 /*for (var i = 1; i < 30; i++) {
@@ -293,6 +231,7 @@ var processed = 0;
 	iimDisplay("Corriendo el robot, intento numero "+i);
 	processed = processed  + runRobot(true);
 }*/
+iimPlay("Movistar\\1_Login");
 runRobot(true);
 iimDisplay("Llego a su fin, procesados:"+processed);
 // The remote server returned an error
