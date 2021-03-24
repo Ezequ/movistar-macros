@@ -1,4 +1,5 @@
 function runRobot(needLogin) {
+	iimPlay("Movistar\\0_Inicio");
 	var loginTry = 0;
 	if (checkIfUserIsLogOut(loginTry)){
 		iimDisplay('Deslogueado, intentando loguear.');
@@ -50,10 +51,8 @@ function runRobot(needLogin) {
 			  	//window.alert(screenIsLoaded);
 				// Validacion de datos necesarios para buscar lineas activas
 				if (screenIsLoaded == '1'){
-					var anchors = window.content.document.querySelectorAll('[data-tipo_numero="cms"]');
 					walkThrowTable();
 					window.alert("TERMINO");
-					//window.alert('cargo bien');	
 				} else if (screenIsLoaded ==  '-802') {
 					var error = 2;
 					needNextRuc = sendInformation(taskId, 'CLIENTE-NO-ENCONTRADO', ruc);
@@ -64,7 +63,6 @@ function runRobot(needLogin) {
 					needNextRuc = sendInformation(taskId, 'RUC-INVALIDO', ruc);
 					return processed;
 				}
-				//window.alert(error);
 				if (error) {
 					if (error == 2) {
 						// El RUC no tiene la info asique aviso al sistema
@@ -78,7 +76,6 @@ function runRobot(needLogin) {
 						goBackToSisacLogin()
 						break;
 					}
-					window.alert('asd');
 				} else {
 					
 					// Si funciono correctamente , leo el proximo
@@ -86,7 +83,6 @@ function runRobot(needLogin) {
 					processed++;
 				}
 			} 
-			//window.alert(i);
 		} else {
 			continue;
 		}
@@ -186,38 +182,138 @@ function searchMenuExists() {
 	return exists;
 }
 
+function textExists(text, element){
+	if (element == undefined) {
+		element = window.content.document.body;
+	}
+	return element.innerHTML.includes(text);
+}
+
 function walkThrowTable() {
 	//var anchors = getAllElementsWithAttribute('[data-tipo_numero="cms"]');
 	var anchors = window.content.document.getElementsByClassName("btn-telefono-mt");
 	for (var i = 0; i < anchors.length; i++) {
-		window.alert("ANCHOR:"+i);
+		//printMessge("ANCHOR:"+i);
 		var element = anchors[i];
 		element.click();
+		checkIfUnlogged();
+		wait(2);
 		if (window.content.document.body.innerHTML.includes('No se encontraron registros')){
 			continue;
 		}
 		var list = window.content.document.getElementById("collapseAfiliacion");
+		walkThrowRows(list);
+	}
+}
+
+function walkThrowRows(list) {
+	var notFoundForAWhile = 0;
+	var maxToleranceForNotFound = 5;
+	if (list != null) {
 		var trs = list.getElementsByTagName("tr");
 		for (var j = 0; j < trs.length; j++) {
+			var infoRow = 0;
 			if (j == 0) continue; // header
-			var tr = trs[j];
-			//window.alert(tds[0]);
-			var tds = tr.getElementsByTagName("td");
-			if (tds.length && tds[0] != "undefined") {
-				var lineNumber = tds[2].innerText;
-				var clientCode = tds[3].innerText;
-				var account = tds[4].innerText;
-				if (shouldGetReceipe(lineNumber, clientCode, account)) {
-
+			infoRow = getInfoFromRow(j, trs[j]);
+			if (infoRow == -1) {
+				notFoundForAWhile++;
+				if (notFoundForAWhile == maxToleranceForNotFound) {
+					break;
 				}
-				window.alert("TD VALUE:"+lineNumber+ "TD VALUE:"+clientCode+"TD VALUE:"+account);
+			} else {
+				notFoundForAWhile = 0;
 			}
 		}
 	}
 }
 
-function shouldGetReceipe(lineNumber, clientCode, account){
-	return true;
+function getInfoFromRow(pos, tr) {
+	var tds = tr.getElementsByTagName("td");
+	var infoResult = 0;
+	if (tds.length && elementIsset(tds[0])) {
+		var lineNumber = tds[2].innerText;
+		var clientCode = tds[3].innerText;
+		var account = tds[4].innerText;
+		var historyButton = tds[8].getElementsByClassName("historial_envios")[0];
+		//printMessge("TD VALUE:"+lineNumber+ "TD VALUE:"+clientCode+"TD VALUE:"+account);
+		if (shouldGetReceipe(lineNumber, clientCode, account, historyButton)) {
+			for (var retry = 0; retry < 3 ; retry++) {
+				// Trato de obtener la factura abriendo el modal
+				iimSet("POS",pos);
+				iimPlay("Movistar\\3_ClickClock");
+				wait(1);
+				var modalEvaluation = evaluateModal();
+				printMessge('Resultado envio posicion'+ pos +' : '+ modalEvaluation);
+				if (modalEvaluation == 1) {
+					// Estamos para tratar de mandar
+					infoResult = sendReceipe();
+					iimPlay("Movistar\\4_CerrarModal");
+					break;
+				} else if(modalEvaluation == -2) {
+					// Fallo, asique reintento
+					iimPlay("Movistar\\4_CerrarModal");
+				} else {
+					iimPlay("Movistar\\4_CerrarModal");
+					infoResult = modalEvaluation;
+					break;
+				}
+			}
+		}
+	}
+	return infoResult;
+}
+
+function sendReceipe(){
+	var tr = bodyAfiliacion[0].getElementsByTagName("tr")[2];
+	printMessge(tr.innerText);
+	window.alert("llegue");
+}
+
+function evaluateModal() {
+	var result = 0;
+	checkIfUnlogged();
+	if(textExists("No se encontr")) {
+		result = -1;
+	} else if (textExists("un error al momento de")) {
+		result = -2;
+	} else {
+		var bodyAfiliacion = window.document.getElementsByClassName("body-afiliacion");
+		if (bodyAfiliacion.length > 0 ) {
+			var tr = bodyAfiliacion[0].getElementsByTagName("tr")[2];
+			printMessge(tr.innerText);
+			return 1;
+		} else {
+			window.alert("Que corno paso aca");
+			return -2;
+		}
+	}
+	return result;
+}
+
+
+function checkIfUnlogged() {
+	if (textExists("ha expirado")) {
+		throw new Error('DESLOGUEADO'); 
+	}
+}
+
+function printMessge(msg) {
+	iimDisplay(msg);
+	wait(1);
+}
+
+function wait(time) {
+	iimSet("WAIT",time);
+	iimPlay("Movistar\\Wait");
+}
+
+
+function shouldGetReceipe(lineNumber, clientCode, account, history){
+	return elementIsset(history);
+}
+
+function elementIsset(element) {
+	return typeof element !== 'undefined';
 }
 
 
@@ -231,7 +327,24 @@ var processed = 0;
 	iimDisplay("Corriendo el robot, intento numero "+i);
 	processed = processed  + runRobot(true);
 }*/
-iimPlay("Movistar\\1_Login");
-runRobot(true);
-iimDisplay("Llego a su fin, procesados:"+processed);
+
 // The remote server returned an error
+
+
+
+// try {
+	// runRobot(true);
+// } catch (e) {
+// 	throw e;
+// 	window.alert("Catcheada excepcion:"+ e);
+// 	if (e.message == "DESLOGUEADO") {
+// 		runRobot(true)
+// 	} else {
+// 		window.alert("EXCEPTION:"+ e.message);
+// 	}	
+// }
+
+
+walkThrowTable();
+
+
